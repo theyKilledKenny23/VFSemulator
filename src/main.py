@@ -1,10 +1,77 @@
 import tkinter as tk
 import shlex
+import argparse
+import csv
+import datetime
+import os
 
 state = {
-    "vfs_name": "myOS",
-    "current_dir": "~"
+    "vfs_name": "EmulatorVFS",
+    "current_dir": "~",
+    "vfs_path": None,
+    "log_file": None,
+    "script_path": None,
+    "username": os.environ.get("USERNAME",
+                               os.environ.get("USER", "unknown"))
 }
+
+def parse_args():
+    '''Разбирает аргументы командной строки.'''
+    parser = argparse.ArgumentParser(description="Эмулятор оболочки VFS")
+    parser.add_argument("--vfs-path", help="Путь к VFS")
+    parser.add_argument("--log-file", help="Путь к лог-файлу")
+    parser.add_argument("--script", help="Путь к стартовому скрипту")
+    return parser.parse_args()
+
+def apply_args(args):
+    '''Применяет аргументы к состоянию приложения.'''
+    if args.vfs_path:
+        state["vfs_path"] = args.vfs_path
+    if args.log_file:
+        state["log_file"] = args.log_file
+    if args.script:
+        state["script_path"] = args.script
+
+def print_debug_info():
+    '''Выводит отладочную информацию о параметрах запуска.'''
+    write_output("=== Параметры запуска ===")
+    vfs = state["vfs_path"] or "не задан"
+    log = state["log_file"] or "не задан"
+    scr = state["script_path"] or "не задан"
+    write_output(f"VFS: {vfs}")
+    write_output(f"Лог-файл: {log}")
+    write_output(f"Скрипт: {scr}")
+    write_output(f"Пользователь: {state['username']}")
+    write_output("=========================")
+
+def log_event(command, error=None):
+    """Записывает событие вызова команды в CSV-лог."""
+    log_file = state["log_file"]
+    if not log_file:
+        return
+
+    now = datetime.datetime.now()
+    row = {
+        "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "username": state["username"],
+        "command": command,
+        "error": error or "",
+    }
+
+    try:
+        log_dir = os.path.dirname(log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+
+        file_exists = os.path.isfile(log_file)
+        fields = ["timestamp", "username", "command", "error"]
+        with open(log_file, "a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fields)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(row)
+    except OSError as e:
+        write_output(f"ошибка записи лога: {e}", is_error=True)
 
 def write_output(text, is_error=False):
     '''Вывод в окно'''
@@ -15,6 +82,62 @@ def write_output(text, is_error=False):
         output.insert(tk.END, text + "\n")
     output.see(tk.END)
     output.config(state=tk.DISABLED)
+
+def execute_command(raw):
+    '''
+    Выполняет команду.
+    Возвращает True при успехе, False при ошибке.
+    '''
+    if not raw.strip():
+        return True
+
+    try:
+        args = shlex.split(raw)
+    except ValueError as e:
+        msg = f"не удалось разобрать команду: {e}"
+        write_output(msg, is_error=True)
+        log_event(raw, error=msg)
+        return False
+
+    cmd_name = args[0]
+    cmd_args = args[1:]
+    handler = COMMANDS.get(cmd_name)
+
+    if handler is None:
+        msg = f"неизвестная команда: {cmd_name}"
+        write_output(msg, is_error=True)
+        log_event(raw, error=msg)
+        return False
+
+    handler(cmd_args)
+    log_event(raw)
+    return True
+
+def run_script(path):
+    '''Выполняет стартовый скрипт команд эмулятора.'''
+    if not os.path.isfile(path):
+        write_output(f"скрипт не найден: {path}", is_error=True)
+        return
+
+    write_output(f"=== Выполнение скрипта: {path} ===")
+
+    with open(path, "r", encoding="utf-8") as f:
+        for line_num, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            prompt = f"{state['vfs_name']}@vfs:{state['current_dir']}$ "
+            write_output(f"{prompt}{line}")
+
+            success = execute_command(line)
+            if not success:
+                msg = f"скрипт остановлен на строке {line_num}"
+                write_output(msg, is_error=True)
+                log_event(line, error=msg)
+                return
+
+    write_output("=== Скрипт выполнен успешно ===")
 
 def cmd_ls(args):
     '''Команда ls'''
@@ -63,25 +186,10 @@ def on_enter(event):
 
     prompt_text = f"{state['vfs_name']}@vfs:{state['current_dir']}$ "
     write_output(f"{prompt_text}{raw}")
+    execute_command(raw)
 
-    if not raw.strip():
-        return
-
-    try:
-        args = shlex.split(raw)
-    except ValueError as e:
-        write_output(f"не удалось разобрать команду: {e}", is_error=True)
-        return
-
-    cmd_name = args[0]
-    cmd_args = args[1:]
-    handler = COMMANDS.get(cmd_name)
-
-    if handler is None:
-        write_output(f"неизвестная команда: {cmd_name}", is_error=True)
-        return
-    handler(cmd_args)
-
+args = parse_args()
+apply_args(args)
 
 root = tk.Tk()
 root.title(f"VFS: {state['vfs_name']}")
@@ -106,6 +214,10 @@ entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
 entry.bind("<Return>", on_enter)
 entry.focus_set()
 
+print_debug_info()
 write_output("Введите 'help' для списка команд.")
+
+if state["script_path"]:
+    run_script(state["script_path"])
 
 root.mainloop()

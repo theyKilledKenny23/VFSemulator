@@ -1,0 +1,7 @@
+# Демонстрационный скрипт для эмулятора VFS
+
+ls file1 "my folder"
+cd /home/user
+help
+unknown_command
+exit

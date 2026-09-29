@@ -33,3 +33,26 @@ run.bat
 
 # или напрямую
 python src/main.py
+```
+
+### Параметры командной строки
+
+| Параметр       | Описание                    |
+|----------------|-----------------------------|
+| `--vfs-path`   | Путь к физическому VFS      |
+| `--log-file`   | Путь к CSV лог-файлу        |
+| `--script`     | Путь к стартовому скрипту   |
+
+### Примеры запуска
+
+```bash
+# С логированием
+python src/main.py --log-file logs/run.csv
+
+# Со стартовым скриптом
+python src/main.py --script scripts/demo.txt
+
+# Со всеми параметрами
+python src/main.py --vfs-path ./data/vfs.zip \
+                   --script scripts/demo.txt \
+                   --log-file logs/run.csv
