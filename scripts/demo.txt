@@ -3,5 +3,7 @@
 ls file1 "my folder"
 cd /home/user
 help
+ls
+cd
 unknown_command
 exit

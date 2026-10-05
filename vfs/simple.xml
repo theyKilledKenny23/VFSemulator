@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vfs name="simple_vfs">
+    <root>
+        <file name="readme.txt">This is a readme file.</file>
+        <file name="config.ini" encoding="base64">
+            [general]
+            name=test
+            version=1.0
+        </file>
+        <dir name="docs">
+            <file name="guide.txt">User guide content here.</file>
+        </dir>
+        <dir name="data">
+            <file name="sample.csv">id,name,value
+1,Alice,100
+2,Bob,200</file>
+        </dir>
+    </root>
+</vfs>

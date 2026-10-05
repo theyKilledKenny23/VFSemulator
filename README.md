@@ -56,3 +56,18 @@ python src/main.py --script scripts/demo.txt
 python src/main.py --vfs-path ./data/vfs.zip \
                    --script scripts/demo.txt \
                    --log-file logs/run.csv
+```
+### Тестирование различных VFS
+
+```bash
+# Минимальная VFS (1 файл)
+scripts\run_minimal_vfs.bat
+
+# Простая VFS (несколько файлов и папок)
+scripts\run_simple_vfs.bat
+
+# Сложная VFS (3+ уровней вложенности)
+scripts\run_complex_vfs.bat
+
+# Тестирование всех команд через стартовый скрипт
+python src\main.py --vfs-path vfs\simple.xml --script scripts\test_stage3.txt --log-file logs\test_stage3.csv

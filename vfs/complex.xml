@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vfs name="complex_vfs">
+    <root>
+        <file name="root_file.txt">Root level file</file>
+
+        <dir name="level1">
+            <file name="l1_file.txt">Level 1 file</file>
+
+            <dir name="level2">
+                <file name="l2_file.txt">Level 2 file</file>
+
+                <dir name="level3">
+                    <file name="l3_file.txt">Level 3 file</file>
+                    <file name="binary.dat" encoding="base64">SGVsbG8gQmluYXJ5IQ==</file>
+                </dir>
+            </dir>
+        </dir>
+
+        <dir name="projects">
+            <dir name="project1">
+                <file name="main.py">print("Hello from project1")</file>
+                <file name="utils.py">def helper(): pass</file>
+            </dir>
+            <dir name="project2">
+                <file name="app.js">console.log("project2");</file>
+            </dir>
+        </dir>
+    </root>
+</vfs>

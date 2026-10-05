@@ -4,6 +4,8 @@ import argparse
 import csv
 import datetime
 import os
+import xml.etree.ElementTree as ET
+import base64
 
 state = {
     "vfs_name": "EmulatorVFS",
@@ -12,8 +14,65 @@ state = {
     "log_file": None,
     "script_path": None,
     "username": os.environ.get("USERNAME",
-                               os.environ.get("USER", "unknown"))
+                               os.environ.get("USER", "unknown")),
+    "vfs_data": None
 }
+
+def parse_vfs_node(element):
+    """Рекурсивно парсит XML-элемент в структуру VFS."""
+    if element.tag == "file":
+        name = element.get("name")
+        encoding = element.get("encoding")
+        content = element.text or ""
+
+        if encoding == "base64":
+            try:
+                content = base64.b64decode(content).decode("utf-8", errors="replace")
+            except Exception:
+                content = "[binary data]"
+
+        return {"type": "file", "name": name, "content": content}
+
+    elif element.tag == "dir":
+        name = element.get("name")
+        children = {}
+        for child in element:
+            child_node = parse_vfs_node(child)
+            if child_node and "name" in child_node:
+                children[child_node["name"]] = child_node
+        return {"type": "dir", "name": name, "children": children}
+
+    return None
+
+def load_vfs(path):
+    """Загружает VFS из XML-файла в память."""
+    try:
+        tree = ET.parse(path)
+        root = tree.getroot()
+
+        if root.tag != "vfs":
+            raise ValueError("Неверный корневой элемент XML")
+
+        vfs_name = root.get("name", "default_vfs")
+        root_element = root.find("root")
+
+        if root_element is None:
+            raise ValueError("Отсутствует корневая директория 'root'")
+
+        vfs_structure = parse_vfs_node(root_element)
+
+        state["vfs_name"] = vfs_name
+        state["vfs_data"] = vfs_structure
+        state["current_dir"] = "/"
+
+        write_output(f"VFS '{vfs_name}' успешно загружена из {path}")
+
+    except FileNotFoundError:
+        write_output(f"ошибка: файл VFS не найден: {path}", is_error=True)
+    except ET.ParseError as e:
+        write_output(f"ошибка: неверный формат XML: {e}", is_error=True)
+    except ValueError as e:
+        write_output(f"ошибка: неверная структура VFS: {e}", is_error=True)
 
 def parse_args():
     '''Разбирает аргументы командной строки.'''
@@ -27,6 +86,7 @@ def apply_args(args):
     '''Применяет аргументы к состоянию приложения.'''
     if args.vfs_path:
         state["vfs_path"] = args.vfs_path
+        state["vfs_name"] = os.path.basename(args.vfs_path)
     if args.log_file:
         state["log_file"] = args.log_file
     if args.script:
@@ -213,6 +273,11 @@ entry = tk.Entry(input_frame)
 entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
 entry.bind("<Return>", on_enter)
 entry.focus_set()
+
+if state["vfs_path"]:
+    load_vfs(state["vfs_path"])
+else:
+    write_output("VFS не указана, работа в режиме заглушек.")
 
 print_debug_info()
 write_output("Введите 'help' для списка команд.")
