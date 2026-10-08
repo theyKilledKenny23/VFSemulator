@@ -1,22 +1,15 @@
 help
 pwd
 ls
-cd level1
+mkdir new_folder
+ls
+cd new_folder
 pwd
+mkdir subfolder
 ls
-cd level2/level3
-pwd
-ls
-tac l3_file.txt
-du l3_file.txt
-du .
 cd ..
-cd ..
-cd ..
-cd projects/project1
-ls
-tac main.py
-du .
-cd /
-ls root_file.txt
+ls new_folder
+du new_folder
+mkdir existing_folder
+mkdir
 exit

@@ -335,6 +335,50 @@ def cmd_du(args):
     size = get_node_size(node)
     write_output(f"{size}\t{args[0]}")
 
+def cmd_mkdir(args):
+    """Создаёт новый каталог в VFS (только в памяти)."""
+    if len(args) != MAX_ARGS_1:
+        write_output("mkdir: требуется ровно один аргумент (путь)", is_error=True)
+        return
+
+    if not state["vfs_data"]:
+        write_output("mkdir: VFS не загружена", is_error=True)
+        return
+
+    path_parts = resolve_path(args[0])
+    if not path_parts:
+        write_output("mkdir: нельзя создать корневой каталог", is_error=True)
+        return
+
+    dir_name = path_parts[-1]
+    parent_parts = path_parts[:-1]
+    parent = get_node(parent_parts)
+
+    if parent is None:
+        write_output(
+            f"mkdir: {args[0]}: родительский каталог не существует",
+            is_error=True,
+        )
+        return
+
+    if parent["type"] != "dir":
+        write_output(
+            f"mkdir: {args[0]}: родитель не является каталогом",
+            is_error=True,
+        )
+        return
+
+    if dir_name in parent["children"]:
+        write_output(f"mkdir: {args[0]}: уже существует", is_error=True)
+        return
+
+    parent["children"][dir_name] = {
+        "type": "dir",
+        "name": dir_name,
+        "children": {},
+    }
+    write_output(f"mkdir: каталог '{dir_name}' создан")
+
 def cmd_help(args):
     '''Команда help'''
     if args:
@@ -347,6 +391,7 @@ def cmd_help(args):
     text += "  pwd              — показать текущий каталог\n"
     text += "  tac <файл>       — вывести файл в обратном порядке строк\n"
     text += "  du <путь>        — показать размер файла или каталога\n"
+    text += "  mkdir <путь>     — создать новый каталог\n"
     text += "  help             — показать эту справку\n"
     text += "  exit             — выйти из эмулятора"
     write_output(text)
@@ -367,6 +412,7 @@ COMMANDS = {
     "pwd": cmd_pwd,
     "tac": cmd_tac,
     "du": cmd_du,
+    "mkdir": cmd_mkdir
 }
 
 def on_enter(event):
