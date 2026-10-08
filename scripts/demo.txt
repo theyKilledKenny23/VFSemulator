@@ -1,9 +1,22 @@
-# Демонстрационный скрипт для эмулятора VFS
-
-ls file1 "my folder"
-cd /home/user
 help
+pwd
 ls
-cd
-unknown_command
+cd level1
+pwd
+ls
+cd level2/level3
+pwd
+ls
+tac l3_file.txt
+du l3_file.txt
+du .
+cd ..
+cd ..
+cd ..
+cd projects/project1
+ls
+tac main.py
+du .
+cd /
+ls root_file.txt
 exit

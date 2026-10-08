@@ -33,7 +33,7 @@ def parse_vfs_node(element):
 
         return {"type": "file", "name": name, "content": content}
 
-    elif element.tag == "dir":
+    elif element.tag in ("dir", "root"):
         name = element.get("name")
         children = {}
         for child in element:
@@ -199,17 +199,141 @@ def run_script(path):
 
     write_output("=== Скрипт выполнен успешно ===")
 
+MAX_ARGS_1 = 1
+
+def update_prompt():
+    """Обновляет текст приглашения командной строки в GUI."""
+    prompt_text = f"{state['vfs_name']}@vfs:{state['current_dir']}$ "
+    prompt_label.config(text=prompt_text)
+
+def resolve_path(path_str):
+    """Преобразует строку пути в список частей (каталогов/файлов)."""
+    if not path_str or path_str == "/":
+        return []
+
+    parts = path_str.strip("/").split("/")
+
+    if path_str.startswith("/"):
+        current_parts = []
+    else:
+        current_dir_str = state["current_dir"]
+        current_parts = [] if current_dir_str == "/" else current_dir_str.strip("/").split("/")
+
+    for part in parts:
+        if part == ".":
+            continue
+        elif part == "..":
+            if current_parts:
+                current_parts.pop()
+        else:
+            current_parts.append(part)
+
+    return current_parts
+
+def get_node(path_parts):
+    """Возвращает узел VFS по списку частей пути."""
+    if not state["vfs_data"]:
+        return None
+    node = state["vfs_data"]
+    for part in path_parts:
+        if node["type"] != "dir" or part not in node["children"]:
+            return None
+        node = node["children"][part]
+    return node
+
+def get_node_size(node):
+    """Рекурсивно вычисляет размер узла (файла или каталога)."""
+    if node["type"] == "file":
+        return len(node["content"])
+    return sum(get_node_size(child) for child in node["children"].values())
+
 def cmd_ls(args):
-    '''Команда ls'''
-    write_output(f"ls: вызов с аргументами {args}")
+    """Выводит содержимое каталога."""
+    if not state["vfs_data"]:
+        write_output("ls: VFS не загружена", is_error=True)
+        return
+
+    targets = args if args else [state["current_dir"]]
+
+    for target in targets:
+        path_parts = resolve_path(target)
+        node = get_node(path_parts)
+
+        if node is None:
+            write_output(f"ls: {target}: нет такого файла или каталога", is_error=True)
+            continue
+
+        if node["type"] == "file":
+            write_output(node["name"])
+        else:
+            items = "  ".join(node["children"].keys())
+            write_output(items)
 
 def cmd_cd(args):
-    '''Команда cd'''
-    if len(args) > 1:
+    """Меняет текущий каталог."""
+    if len(args) > MAX_ARGS_1:
         write_output("cd: слишком много аргументов", is_error=True)
         return
-    write_output(f"cd: вызов с аргументами {args}")
 
+    target_path = args[0] if args else "/"
+    path_parts = resolve_path(target_path)
+    node = get_node(path_parts)
+
+    if node is None:
+        write_output(f"cd: {target_path}: нет такого файла или каталога", is_error=True)
+        return
+
+    if node["type"] != "dir":
+        write_output(f"cd: {target_path}: не является каталогом", is_error=True)
+        return
+
+    new_dir = "/" + "/".join(path_parts) if path_parts else "/"
+    state["current_dir"] = new_dir
+    update_prompt()
+
+def cmd_pwd(args):
+    """Выводит путь к текущему каталогу."""
+    if args:
+        write_output("pwd: команда не принимает аргументов", is_error=True)
+        return
+    write_output(state["current_dir"])
+
+def cmd_tac(args):
+    """Выводит содержимое файла в обратном порядке по строкам."""
+    if len(args) != MAX_ARGS_1:
+        write_output("tac: требуется ровно один аргумент (файл)", is_error=True)
+        return
+
+    path_parts = resolve_path(args[0])
+    node = get_node(path_parts)
+
+    if node is None:
+        write_output(f"tac: {args[0]}: нет такого файла", is_error=True)
+        return
+
+    if node["type"] != "file":
+        write_output(f"tac: {args[0]}: это каталог, а не файл", is_error=True)
+        return
+
+    lines = node["content"].split("\n")
+    lines.reverse()
+    write_output("\n".join(lines))
+
+def cmd_du(args):
+    """Выводит размер файла или каталога."""
+    if len(args) != MAX_ARGS_1:
+        write_output("du: требуется ровно один аргумент", is_error=True)
+        return
+
+    path_parts = resolve_path(args[0])
+    node = get_node(path_parts)
+
+    if node is None:
+        write_output(f"du: {args[0]}: нет такого файла или каталога", is_error=True)
+        return
+
+    size = get_node_size(node)
+    write_output(f"{size}\t{args[0]}")
 
 def cmd_help(args):
     '''Команда help'''
@@ -218,10 +342,13 @@ def cmd_help(args):
         return
 
     text = "Доступные команды:\n"
-    text += "  ls [аргументы]  — список файлов (заглушка)\n"
-    text += "  cd [путь]       — сменить директорию (заглушка)\n"
-    text += "  help            — показать эту справку\n"
-    text += "  exit            — выйти из эмулятора"
+    text += "  ls [путь...]     — список файлов и каталогов\n"
+    text += "  cd [путь]        — сменить текущий каталог\n"
+    text += "  pwd              — показать текущий каталог\n"
+    text += "  tac <файл>       — вывести файл в обратном порядке строк\n"
+    text += "  du <путь>        — показать размер файла или каталога\n"
+    text += "  help             — показать эту справку\n"
+    text += "  exit             — выйти из эмулятора"
     write_output(text)
 
 
@@ -237,6 +364,9 @@ COMMANDS = {
     "cd": cmd_cd,
     "help": cmd_help,
     "exit": cmd_exit,
+    "pwd": cmd_pwd,
+    "tac": cmd_tac,
+    "du": cmd_du,
 }
 
 def on_enter(event):
