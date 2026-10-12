@@ -247,27 +247,115 @@ def get_node_size(node):
         return len(node["content"])
     return sum(get_node_size(child) for child in node["children"].values())
 
+SIZE_UNITS_BASE = 1024
+
+
+def parse_ls_flags(args):
+    """Разбирает аргументы ls на флаги и пути.
+    Возвращает (flags_dict, paths_list) или (None, None) при ошибке.
+    """
+    valid_flags = {"l", "h", "a"}
+    flags = {"l": False, "h": False, "a": False}
+    paths = []
+
+    for arg in args:
+        if arg.startswith("-") and len(arg) > 1:
+            for char in arg[1:]:
+                if char in valid_flags:
+                    flags[char] = True
+                else:
+                    write_output(
+                        f"ls: неверный флаг: -{char}",
+                        is_error=True,
+                    )
+                    return None, None
+        else:
+            paths.append(arg)
+
+    return flags, paths
+
+
+def format_size(size, human_readable):
+    """Форматирует размер файла (с опцией -h)."""
+    if not human_readable:
+        return str(size)
+
+    units = ["B", "K", "M", "G"]
+    unit_index = 0
+    value = float(size)
+
+    while value >= SIZE_UNITS_BASE and unit_index < len(units) - 1:
+        value /= SIZE_UNITS_BASE
+        unit_index += 1
+
+    if unit_index == 0:
+        return f"{int(value)}{units[unit_index]}"
+    return f"{value:.1f}{units[unit_index]}"
+
 def cmd_ls(args):
     """Выводит содержимое каталога."""
     if not state["vfs_data"]:
         write_output("ls: VFS не загружена", is_error=True)
         return
 
-    targets = args if args else [state["current_dir"]]
+    flags, paths = parse_ls_flags(args)
+    if flags is None:
+        return
 
-    for target in targets:
+    if not paths:
+        paths = [state["current_dir"]]
+
+    for target in paths:
         path_parts = resolve_path(target)
         node = get_node(path_parts)
 
         if node is None:
-            write_output(f"ls: {target}: нет такого файла или каталога", is_error=True)
+            write_output(
+                f"ls: {target}: нет такого файла или каталога",
+                is_error=True,
+            )
             continue
 
         if node["type"] == "file":
-            write_output(node["name"])
+            ls_show_file(node, flags)
         else:
-            items = "  ".join(node["children"].keys())
-            write_output(items)
+            ls_show_dir(node, flags)
+
+
+def ls_show_file(node, flags):
+    """Выводит информацию о файле."""
+    if flags["l"]:
+        size_str = format_size(len(node["content"]), flags["h"])
+        write_output(f"-  {size_str}  {node['name']}")
+    else:
+        write_output(node["name"])
+
+
+def ls_show_dir(node, flags):
+    """Выводит содержимое каталога."""
+    items = node["children"].items()
+    if not flags["a"]:
+        items = [
+            (name, child)
+            for name, child in items
+            if not name.startswith(".")
+        ]
+
+    if flags["l"]:
+        for name, child in items:
+            ls_format_entry(name, child, flags)
+    else:
+        names = [name for name, _ in items]
+        write_output("  ".join(names))
+
+
+def ls_format_entry(name, child, flags):
+    """Форматирует одну запись в режиме -l."""
+    if child["type"] == "file":
+        size_str = format_size(len(child["content"]), flags["h"])
+        write_output(f"-  {size_str}  {name}")
+    else:
+        write_output(f"d  0  {name}")
 
 def cmd_cd(args):
     """Меняет текущий каталог."""
@@ -344,7 +432,6 @@ def cmd_mkdir(args):
     if not state["vfs_data"]:
         write_output("mkdir: VFS не загружена", is_error=True)
         return
-
     path_parts = resolve_path(args[0])
     if not path_parts:
         write_output("mkdir: нельзя создать корневой каталог", is_error=True)
@@ -360,14 +447,12 @@ def cmd_mkdir(args):
             is_error=True,
         )
         return
-
     if parent["type"] != "dir":
         write_output(
             f"mkdir: {args[0]}: родитель не является каталогом",
             is_error=True,
         )
         return
-
     if dir_name in parent["children"]:
         write_output(f"mkdir: {args[0]}: уже существует", is_error=True)
         return
@@ -380,20 +465,26 @@ def cmd_mkdir(args):
     write_output(f"mkdir: каталог '{dir_name}' создан")
 
 def cmd_help(args):
-    '''Команда help'''
+    """Команда help."""
     if args:
-        write_output("help: команда не принимает аргументов", is_error=True)
+        write_output(
+            "help: команда не принимает аргументов",
+            is_error=True,
+        )
         return
 
     text = "Доступные команды:\n"
-    text += "  ls [путь...]     — список файлов и каталогов\n"
-    text += "  cd [путь]        — сменить текущий каталог\n"
-    text += "  pwd              — показать текущий каталог\n"
-    text += "  tac <файл>       — вывести файл в обратном порядке строк\n"
-    text += "  du <путь>        — показать размер файла или каталога\n"
-    text += "  mkdir <путь>     — создать новый каталог\n"
-    text += "  help             — показать эту справку\n"
-    text += "  exit             — выйти из эмулятора"
+    text += "  ls [флаги] [путь...]  — список файлов\n"
+    text += "    -l  подробный вывод (тип, размер, имя)\n"
+    text += "    -h  человеко-читаемые размеры (K, M, G)\n"
+    text += "    -a  показать скрытые файлы (с точкой)\n"
+    text += "  cd [путь]             — сменить каталог\n"
+    text += "  pwd                   — показать каталог\n"
+    text += "  tac <файл>            — файл в обратном порядке\n"
+    text += "  du <путь>             — размер файла/каталога\n"
+    text += "  mkdir <путь>          — создать каталог\n"
+    text += "  help                  — эта справка\n"
+    text += "  exit                  — выйти из эмулятора"
     write_output(text)
 
 
