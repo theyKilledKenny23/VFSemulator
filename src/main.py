@@ -27,7 +27,8 @@ def parse_vfs_node(element):
 
         if encoding == "base64":
             try:
-                content = base64.b64decode(content).decode("utf-8", errors="replace")
+                content = base64.b64decode(content).decode("utf-8",
+                                                           errors="replace")
             except Exception:
                 content = "[binary data]"
 
@@ -217,7 +218,8 @@ def resolve_path(path_str):
         current_parts = []
     else:
         current_dir_str = state["current_dir"]
-        current_parts = [] if current_dir_str == "/" else current_dir_str.strip("/").split("/")
+        current_parts = [] if (current_dir_str ==
+                               "/") else current_dir_str.strip("/").split("/")
 
     for part in parts:
         if part == ".":
@@ -260,7 +262,8 @@ def cmd_ls(args):
         node = get_node(path_parts)
 
         if node is None:
-            write_output(f"ls: {target}: нет такого файла или каталога", is_error=True)
+            write_output(f"ls: {target}: нет такого файла или каталога",
+                         is_error=True)
             continue
 
         if node["type"] == "file":
@@ -280,11 +283,13 @@ def cmd_cd(args):
     node = get_node(path_parts)
 
     if node is None:
-        write_output(f"cd: {target_path}: нет такого файла или каталога", is_error=True)
+        write_output(f"cd: {target_path}: нет такого файла или каталога",
+                     is_error=True)
         return
 
     if node["type"] != "dir":
-        write_output(f"cd: {target_path}: не является каталогом", is_error=True)
+        write_output(f"cd: {target_path}: не является каталогом",
+                     is_error=True)
         return
 
     new_dir = "/" + "/".join(path_parts) if path_parts else "/"
@@ -329,7 +334,8 @@ def cmd_du(args):
     node = get_node(path_parts)
 
     if node is None:
-        write_output(f"du: {args[0]}: нет такого файла или каталога", is_error=True)
+        write_output(f"du: {args[0]}: нет такого файла или каталога",
+                     is_error=True)
         return
 
     size = get_node_size(node)
