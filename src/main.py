@@ -17,7 +17,6 @@ state = {
                                os.environ.get("USER", "unknown")),
     "vfs_data": None
 }
-
 def parse_vfs_node(element):
     """Рекурсивно парсит XML-элемент в структуру VFS."""
     if element.tag == "file":
