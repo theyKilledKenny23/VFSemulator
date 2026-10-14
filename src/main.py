@@ -27,7 +27,8 @@ def parse_vfs_node(element):
 
         if encoding == "base64":
             try:
-                content = base64.b64decode(content).decode("utf-8", errors="replace")
+                content = base64.b64decode(content).decode("utf-8"
+                                                           , errors="replace")
             except Exception:
                 content = "[binary data]"
 
