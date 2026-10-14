@@ -4,7 +4,7 @@ import argparse
 import csv
 import datetime
 import os
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as e_t
 import base64
 
 state = {
@@ -48,7 +48,7 @@ def parse_vfs_node(element):
 def load_vfs(path):
     """Загружает VFS из XML-файла в память."""
     try:
-        tree = ET.parse(path)
+        tree = e_t.parse(path)
         root = tree.getroot()
 
         if root.tag != "vfs":
@@ -70,7 +70,7 @@ def load_vfs(path):
 
     except FileNotFoundError:
         write_output(f"ошибка: файл VFS не найден: {path}", is_error=True)
-    except ET.ParseError as e:
+    except e_t.ParseError as e:
         write_output(f"ошибка: неверный формат XML: {e}", is_error=True)
     except ValueError as e:
         write_output(f"ошибка: неверная структура VFS: {e}", is_error=True)
