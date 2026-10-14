@@ -217,8 +217,8 @@ def resolve_path(path_str):
         current_parts = []
     else:
         current_dir_str = state["current_dir"]
-        current_parts = [] if (current_dir_str
-                               == "/") else current_dir_str.strip("/").split("/")
+        current_parts = [] if (current_dir_str == "/") \
+            else current_dir_str.strip("/").split("/")
 
     for part in parts:
         if part == ".":
